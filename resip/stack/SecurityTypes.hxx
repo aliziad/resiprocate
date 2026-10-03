@@ -19,9 +19,17 @@ typedef enum
 typedef enum 
 { 
    NoSSL = 0,
+   // Legacy names retained for source compatibility. Both now use modern,
+   // version-flexible TLS negotiation with an explicit minimum version.
    SSLv23 = 1, 
    TLSv1 = 2 
 } SSLType;
+
+typedef enum
+{
+   TLSv1_2,
+   TLSv1_3
+} TlsVersion;
 
 typedef enum
 {

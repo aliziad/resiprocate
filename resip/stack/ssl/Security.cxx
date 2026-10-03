@@ -9,6 +9,7 @@
 #include <ostream>
 #include <fstream>
 #include <stdexcept>
+#include <vector>
 
 #include "resip/stack/Contents.hxx"
 #include "resip/stack/MultipartSignedContents.hxx"
@@ -169,25 +170,16 @@ verifyCallback(int preverifyOk, X509_STORE_CTX* storeCtx)
 // .amr. RFC 5922 mandates exact match only on certificates, so this is the default, but RFC 2459 and RFC 3261 don't prevent wildcards, so enable if you want that mode.
 bool BaseSecurity::mAllowWildcardCertificates = false;
 BaseSecurity::CipherList BaseSecurity::ExportableSuite("HIGH:RC4-SHA:-COMPLEMENTOFDEFAULT");
-BaseSecurity::CipherList BaseSecurity::StrongestSuite("HIGH:-COMPLEMENTOFDEFAULT");
+BaseSecurity::CipherList BaseSecurity::StrongestSuite("HIGH:!aNULL:!eNULL:!MD5:!RC4:!3DES:!DES:!PSK:!SRP:@SECLEVEL=2");
 
-/**
- * Note:
- *
- * When SSLv23 mode is selected and the options flags SSL_OP_NO_SSLv2
- * and SSL_OP_NO_SSLv3 are set, SSLv23_method() will allow a dynamic
- * choice of TLS v1.0, v1.1 or v1.2 on each connection.
- *
- * If SSL_OP_NO_SSLv3 is removed (by an application changing the value
- * of BaseSecurity::OpenSSLCTXSetOptions before instantiating
- * resip::Security) then using SSLv23_method() will allow a dynamic
- * choice of SSL v3.0 or any of the TLS versions on each connection.
- */
-long BaseSecurity::OpenSSLCTXSetOptions = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION;
+// Protocol floors are configured with SSL_CTX_set_min_proto_version().
+// Options are reserved for independent hardening behavior.
+long BaseSecurity::OpenSSLCTXSetOptions = SSL_OP_NO_COMPRESSION;
 long BaseSecurity::OpenSSLCTXClearOptions = 0;
 
-Security::Security(const CipherList& cipherSuite, const Data& defaultPrivateKeyPassPhrase, const Data& dHParamsFilename) :
-   BaseSecurity(cipherSuite, defaultPrivateKeyPassPhrase, dHParamsFilename)
+Security::Security(const CipherList& cipherSuite, const Data& defaultPrivateKeyPassPhrase, const Data& dHParamsFilename,
+                   SecurityTypes::TlsVersion minimumTlsVersion) :
+   BaseSecurity(cipherSuite, defaultPrivateKeyPassPhrase, dHParamsFilename, minimumTlsVersion)
 {
 #ifdef WIN32
    mPath = "C:\\sipCerts\\";
@@ -201,8 +193,9 @@ Security::Security(const CipherList& cipherSuite, const Data& defaultPrivateKeyP
 #endif
 }
 
-Security::Security(const Data& directory, const CipherList& cipherSuite, const Data& defaultPrivateKeyPassPhrase, const Data& dHParamsFilename) :
-   BaseSecurity(cipherSuite, defaultPrivateKeyPassPhrase, dHParamsFilename),
+Security::Security(const Data& directory, const CipherList& cipherSuite, const Data& defaultPrivateKeyPassPhrase, const Data& dHParamsFilename,
+                   SecurityTypes::TlsVersion minimumTlsVersion) :
+   BaseSecurity(cipherSuite, defaultPrivateKeyPassPhrase, dHParamsFilename, minimumTlsVersion),
    mPath(directory)
 {
    // since the preloader won't work otherwise and VERY difficult to figure out.
@@ -404,8 +397,43 @@ int pem_passwd_cb(char *buf, int size, int rwflag, void *password)
    }
 }
 
+namespace
+{
+int openSslProtocolVersion(SecurityTypes::TlsVersion version)
+{
+   switch(version)
+   {
+      case SecurityTypes::TLSv1_2: return TLS1_2_VERSION;
+      case SecurityTypes::TLSv1_3: return TLS1_3_VERSION;
+      default: throw invalid_argument("Unsupported minimum TLS version");
+   }
+}
+
+void configureModernTlsContext(SSL_CTX* ctx, const BaseSecurity::CipherList& cipherList,
+                               SecurityTypes::TlsVersion minimumTlsVersion)
+{
+   if(SSL_CTX_set_min_proto_version(ctx, openSslProtocolVersion(minimumTlsVersion)) != 1 ||
+      SSL_CTX_set_max_proto_version(ctx, 0) != 1)
+   {
+      throw BaseSecurity::Exception("Failed to configure TLS protocol versions", __FILE__, __LINE__);
+   }
+   if(SSL_CTX_set_cipher_list(ctx, cipherList.cipherList().c_str()) != 1)
+   {
+      throw BaseSecurity::Exception("Failed to configure TLS 1.2 cipher list", __FILE__, __LINE__);
+   }
+   if(SSL_CTX_set_ciphersuites(ctx,
+         "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256") != 1)
+   {
+      throw BaseSecurity::Exception("Failed to configure TLS 1.3 cipher suites", __FILE__, __LINE__);
+   }
+   SSL_CTX_set_options(ctx, BaseSecurity::OpenSSLCTXSetOptions);
+   SSL_CTX_clear_options(ctx, BaseSecurity::OpenSSLCTXClearOptions);
+}
+}
+
 SSL_CTX* 
-Security::createDomainCtx(const SSL_METHOD* method, const Data& domain, const Data& certificateFilename, const Data& privateKeyFilename, const Data& privateKeyPassPhrase)
+Security::createDomainCtx(const SSL_METHOD* method, const Data& domain, const Data& certificateFilename, const Data& privateKeyFilename, const Data& privateKeyPassPhrase,
+                          SecurityTypes::TlsVersion minimumTlsVersion)
 {
    SSL_CTX* ctx = SSL_CTX_new(method);
    resip_assert(ctx);
@@ -424,10 +452,8 @@ Security::createDomainCtx(const SSL_METHOD* method, const Data& domain, const Da
    updateDomainCtx(ctx, domain, certificateFilename, privateKeyFilename, privateKeyPassPhrase);
 
    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER|SSL_VERIFY_CLIENT_ONCE, verifyCallback);
-   SSL_CTX_set_cipher_list(ctx, mCipherList.cipherList().c_str());
+   configureModernTlsContext(ctx, mCipherList, minimumTlsVersion);
    setDHParams(ctx);
-   SSL_CTX_set_options(ctx, BaseSecurity::OpenSSLCTXSetOptions);
-   SSL_CTX_clear_options(ctx, BaseSecurity::OpenSSLCTXClearOptions);
 
    return ctx;
 }
@@ -448,7 +474,6 @@ Security::updateDomainCtx(SSL_CTX* ctx, const Data& domain, const Data& certific
       if(SSL_CTX_use_certificate_chain_file(ctx, certFilename.c_str()) != 1)
       {
          ErrLog (<< "Error reading domain chain file " << certFilename);
-         SSL_CTX_free(ctx);
          throw BaseSecurity::Exception("Failed opening PEM chain file", __FILE__,__LINE__);
       }
 
@@ -468,13 +493,11 @@ Security::updateDomainCtx(SSL_CTX* ctx, const Data& domain, const Data& certific
       if(SSL_CTX_use_PrivateKey_file(ctx, keyFilename.c_str(), SSL_FILETYPE_PEM) != 1)
       {
          ErrLog (<< "Error reading domain private key file " << keyFilename);
-         SSL_CTX_free(ctx);
          throw BaseSecurity::Exception("Failed opening PEM private key file", __FILE__,__LINE__);
       }
       if (!SSL_CTX_check_private_key(ctx))
       {
          ErrLog (<< "Invalid domain private key from file: " << keyFilename);
-         SSL_CTX_free(ctx);
          throw BaseSecurity::Exception("Invalid domain private key", __FILE__,__LINE__);
       }
 
@@ -1167,18 +1190,19 @@ Security::Exception::Exception(const Data& msg, const Data& file, const int line
 {
 }
 
-BaseSecurity::BaseSecurity (const CipherList& cipherSuite, const Data& defaultPrivateKeyPassPhrase, const Data& dHParamsFilename) :
+BaseSecurity::BaseSecurity (const CipherList& cipherSuite, const Data& defaultPrivateKeyPassPhrase, const Data& dHParamsFilename,
+                            SecurityTypes::TlsVersion minimumTlsVersion) :
    mTlsCtx(0),
    mSslCtx(0),
    mCipherList(cipherSuite),
    mDefaultPrivateKeyPassPhrase(defaultPrivateKeyPassPhrase),
    mDHParamsFilename(dHParamsFilename),
+   mMinimumTlsVersion(minimumTlsVersion),
    mRootTlsCerts(0),
    mRootSslCerts(0)
 { 
    DebugLog(<< "BaseSecurity::BaseSecurity");
    
-   int ret;
    initialize(); 
    
    mRootTlsCerts = X509_STORE_new();
@@ -1196,29 +1220,21 @@ BaseSecurity::BaseSecurity (const CipherList& cipherSuite, const Data& defaultPr
          ErrLog(<< "OpenSSL error stack: " << errBuf);
       }
    }
-   SSL_CTX_set_min_proto_version(mTlsCtx, TLS1_VERSION);
-   SSL_CTX_set_max_proto_version(mTlsCtx, TLS1_VERSION);
    resip_assert(mTlsCtx);
 
    SSL_CTX_set_default_passwd_cb(mTlsCtx, pem_passwd_cb);
    SSL_CTX_set_cert_store(mTlsCtx, mRootTlsCerts);
    SSL_CTX_set_verify(mTlsCtx, SSL_VERIFY_PEER|SSL_VERIFY_CLIENT_ONCE, verifyCallback);
-   ret = SSL_CTX_set_cipher_list(mTlsCtx, cipherSuite.cipherList().c_str());
-   resip_assert(ret);
+   configureModernTlsContext(mTlsCtx, cipherSuite, mMinimumTlsVersion);
    setDHParams(mTlsCtx);
-   SSL_CTX_set_options(mTlsCtx, BaseSecurity::OpenSSLCTXSetOptions);
-   SSL_CTX_clear_options(mTlsCtx, BaseSecurity::OpenSSLCTXClearOptions);
    
    mSslCtx = SSL_CTX_new( TLS_method() );
    resip_assert(mSslCtx);
    SSL_CTX_set_default_passwd_cb(mSslCtx, pem_passwd_cb);
    SSL_CTX_set_cert_store(mSslCtx, mRootSslCerts);
    SSL_CTX_set_verify(mSslCtx, SSL_VERIFY_PEER|SSL_VERIFY_CLIENT_ONCE, verifyCallback);
-   ret = SSL_CTX_set_cipher_list(mSslCtx,cipherSuite.cipherList().c_str());
-   resip_assert(ret);
+   configureModernTlsContext(mSslCtx, cipherSuite, mMinimumTlsVersion);
    setDHParams(mSslCtx);
-   SSL_CTX_set_options(mSslCtx, BaseSecurity::OpenSSLCTXSetOptions);
-   SSL_CTX_clear_options(mSslCtx, BaseSecurity::OpenSSLCTXClearOptions);
 }
 
 
@@ -1503,6 +1519,11 @@ void
 BaseSecurity::generateUserCert (const Data& pAor, int expireDays, int keyLen )
 {
    int ret;
+
+   if(keyLen < 2048)
+   {
+      throw Exception("RSA keys smaller than 2048 bits are not permitted", __FILE__, __LINE__);
+   }
    
    InfoLog( <<"Generating new user cert for " << pAor );
  
@@ -1524,31 +1545,9 @@ BaseSecurity::generateUserCert (const Data& pAor, int expireDays, int keyLen )
    // Make sure that necessary algorithms exist:
    resip_assert(EVP_sha256());
 
-   RSA* rsa = NULL;
-   {
-      BIGNUM *e = BN_new();
-      RSA *r = NULL;
-      if(!e) goto done;
-      if(! BN_set_word(e, RSA_F4)) goto done;
-      r = RSA_new();
-      if(!r) goto done;
-      if (RSA_generate_key_ex(r, keyLen, e, NULL) == -1)
-         goto done;
-
-      rsa = r;
-      r = NULL;
-   done:
-      if (e)
-         BN_free(e);
-      if (r)
-         RSA_free(r);
-    }
-   resip_assert(rsa);    // couldn't make key pair
-   
-   EVP_PKEY* privkey = EVP_PKEY_new();
+   EVP_PKEY* privkey = EVP_PKEY_Q_keygen(nullptr, nullptr, "RSA",
+                                         static_cast<size_t>(keyLen));
    resip_assert(privkey);
-   ret = EVP_PKEY_set1_RSA(privkey, rsa);
-   resip_assert(ret);
 
    X509* cert = X509_new();
    resip_assert(cert);
@@ -1849,20 +1848,12 @@ BaseSecurity::computeIdentity( const Data& signerDomain, const Data& in ) const
    EVP_PKEY* pKey = k->second;
    resip_assert( pKey );
 
-   RSA* rsa = EVP_PKEY_get1_RSA(pKey);
-
-   if ( !rsa )
+   if(EVP_PKEY_is_a(pKey, "RSA") != 1)
    {
       ErrLog( << "Private key (type=" << EVP_PKEY_id(pKey) << ") for "
               << signerDomain << " is not of type RSA" );
       throw Exception("No RSA private key when computing identity",__FILE__,__LINE__);
    }
-
-   resip_assert( rsa );
-
-   unsigned char result[4096];
-   unsigned int resultSize = sizeof(result);
-   resip_assert( static_cast<int>(resultSize) >= RSA_size(rsa) );
 
    unsigned char digest[EVP_MAX_MD_SIZE];
    unsigned int digestSize = sizeof(digest);
@@ -1874,15 +1865,27 @@ BaseSecurity::computeIdentity( const Data& signerDomain, const Data& in ) const
    }
    DebugLog( << "hash of string is 0x" << Data(digest, digestSize).hex() );
 
-   int r = RSA_sign(EVP_MD_nid(digestType), digest, digestSize, result, &resultSize, rsa);
-   if( r != 1 )
+   EVP_MD_CTX* signingContext = EVP_MD_CTX_new();
+   size_t resultSize = 0;
+   if(!signingContext ||
+      EVP_DigestSignInit(signingContext, nullptr, digestType, nullptr, pKey) != 1 ||
+      EVP_DigestSign(signingContext, nullptr, &resultSize,
+                     reinterpret_cast<const unsigned char*>(in.data()), in.size()) != 1)
    {
-      ErrLog(<< "RSA_sign failed with return " << r);
-      resip_assert(0);
-      return Data::Empty;
+      EVP_MD_CTX_free(signingContext);
+      throw Exception("EVP_DigestSign initialization failed", __FILE__, __LINE__);
    }
 
-   Data res(result,resultSize);
+   std::vector<unsigned char> result(resultSize);
+   if(EVP_DigestSign(signingContext, result.data(), &resultSize,
+                     reinterpret_cast<const unsigned char*>(in.data()), in.size()) != 1)
+   {
+      EVP_MD_CTX_free(signingContext);
+      throw Exception("EVP_DigestSign failed", __FILE__, __LINE__);
+   }
+   EVP_MD_CTX_free(signingContext);
+
+   Data res(result.data(), resultSize);
    DebugLog( << "rsa encrypt of hash is 0x"<< res.hex() );
 
    Data enc = res.base64encode();
@@ -1936,12 +1939,15 @@ BaseSecurity::checkIdentity( const Data& signerDomain, const Data& in, const Dat
    EVP_PKEY* pKey = X509_get_pubkey( cert );
    resip_assert( pKey );
 
-   RSA* rsa = EVP_PKEY_get1_RSA(pKey);
-   resip_assert( rsa );
-
-   int ret = RSA_verify(EVP_MD_nid(digestType), digest,
-                        digestSize, (unsigned char*)sig.data(), (unsigned int)sig.size(),
-                        rsa);
+   EVP_MD_CTX* verifyContext = EVP_MD_CTX_new();
+   int ret = verifyContext && EVP_PKEY_is_a(pKey, "RSA") == 1 &&
+      EVP_DigestVerifyInit(verifyContext, nullptr, digestType, nullptr, pKey) == 1
+      ? EVP_DigestVerify(verifyContext,
+                         reinterpret_cast<const unsigned char*>(sig.data()), sig.size(),
+                         reinterpret_cast<const unsigned char*>(in.data()), in.size())
+      : 0;
+   EVP_MD_CTX_free(verifyContext);
+   EVP_PKEY_free(pKey);
    DebugLog( << "rsa verify result is " << ret  );
 
    static const char IDENTITY_OUT_MSG[] = "identity-out-msg";
@@ -3108,9 +3114,14 @@ BaseSecurity::getUserPrivateKey( const Data& aor )
 void
 BaseSecurity::setDHParams(SSL_CTX* ctx)
 {
+   if(SSL_CTX_set_dh_auto(ctx, 1) != 1)
+   {
+      throw BaseSecurity::Exception("Failed to enable automatic finite-field DH parameters", __FILE__, __LINE__);
+   }
+
    if(mDHParamsFilename.empty())
    {
-      InfoLog(<< "Unable to load DH parameters (required for PFS): TlsDHParamsFilename not specified");
+      DebugLog(<< "Using OpenSSL automatic finite-field DH parameters");
    }
    else
    {
@@ -3122,29 +3133,24 @@ BaseSecurity::setDHParams(SSL_CTX* ctx)
          WarningLog(<< "Unable to load DH parameters (required for PFS): BIO_new_file failed to open file " << mDHParamsFilename);
       }
 
-      DH* dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
-      if(dh == NULL)
+      EVP_PKEY* dhParameters = bio ? PEM_read_bio_Parameters(bio, nullptr) : nullptr;
+      if(dhParameters == nullptr)
       {
-         WarningLog(<< "Unable to load DH parameters (required for PFS): PEM_read_bio_DHparams failed for file " << mDHParamsFilename);
+         WarningLog(<< "Unable to load DH parameters: PEM_read_bio_Parameters failed for file " << mDHParamsFilename);
       }
       else
       {
-         if(!SSL_CTX_set_tmp_dh(ctx, dh))
+         if(SSL_CTX_set0_tmp_dh_pkey(ctx, dhParameters) != 1)
          {
-            WarningLog(<< "Unable to load DH parameters (required for PFS): SSL_CTX_set_tmp_dh failed for file " << mDHParamsFilename);
+            EVP_PKEY_free(dhParameters);
+            WarningLog(<< "Unable to load DH parameters: SSL_CTX_set0_tmp_dh_pkey failed for file " << mDHParamsFilename);
          }
          else
          {
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L
-            uint64_t options;
-#else
-            long options;
-#endif
-            options = SSL_OP_CIPHER_SERVER_PREFERENCE | SSL_OP_SINGLE_DH_USE;
-            options = SSL_CTX_set_options(ctx, options);
-            DebugLog(<<"DH parameters loaded, PFS cipher-suites enabled");
+            // SSL_CTX owns dhParameters after a successful set0 call.
+            SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
+            DebugLog(<<"Provider-based DH parameters loaded");
          }
-         DH_free(dh);
       }
       BIO_free(bio);
    }

@@ -115,6 +115,7 @@ set(INCLUDES
    SipConfigParse.hxx
    SipFrag.hxx
    SipMessage.hxx
+   TlsClientIdentity.hxx
    SipStack.hxx
    ssl/DtlsTransport.hxx
    ssl/MacSecurity.hxx

@@ -165,7 +165,8 @@ SipMessage::SipMessage(const Tuple *receivedTransportTuple)
      mResponse(false),
      mInvalid(false),
      mCreatedTime(Timer::getTimeMicroSec()),
-     mTlsDomain(Data::Empty)
+     mTlsDomain(Data::Empty),
+     mTlsClientIdentity()
 {
    if(receivedTransportTuple)
    {
@@ -267,6 +268,7 @@ SipMessage::init(const SipMessage& rhs)
       mReason = new Data(*rhs.mReason);
    }
    mTlsDomain = rhs.mTlsDomain;
+   mTlsClientIdentity = rhs.mTlsClientIdentity;
 
    mKnownHeaders.reserve(rhs.mKnownHeaders.size());
    for (KnownHeaders::const_reference info : rhs.mKnownHeaders)

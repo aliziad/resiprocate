@@ -402,7 +402,8 @@ class SipStack : public FdSetIOObserver
                               bool useEmailAsSIP = false,
                               std::shared_ptr<WsConnectionValidator> = nullptr,
                               std::shared_ptr<WsCookieContextFactory> = nullptr,
-                              const Data& netNs = Data::Empty
+                              const Data& netNs = Data::Empty,
+                              SecurityTypes::TlsVersion minimumTlsVersion = SecurityTypes::TLSv1_2
                              );
 
       /**

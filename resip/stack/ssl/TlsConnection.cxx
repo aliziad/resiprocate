@@ -11,6 +11,9 @@
 #include "resip/stack/Uri.hxx"
 #include "rutil/Socket.hxx"
 
+#include <algorithm>
+#include <cstring>
+
 #include <openssl/opensslv.h>
 #if !defined(LIBRESSL_VERSION_NUMBER)
 #include <openssl/e_os2.h>
@@ -26,13 +29,30 @@
 
 using namespace resip;
 
+namespace
+{
+int tlsClientPasswordCallback(char* buf, int size, int, void* userdata)
+{
+   const Data* passPhrase = static_cast<const Data*>(userdata);
+   if(!passPhrase || size <= 0)
+   {
+      return 0;
+   }
+   const int length = static_cast<int>(std::min(passPhrase->size(), static_cast<size_t>(size - 1)));
+   memcpy(buf, passPhrase->data(), length);
+   buf[length] = '\0';
+   return length;
+}
+}
+
 #define RESIPROCATE_SUBSYSTEM Subsystem::TRANSPORT
 
 TlsConnection::TlsConnection(Transport* transport, const Tuple& tuple,
    Socket fd, Security* security,
    bool server, Data domain, SecurityTypes::SSLType sslType,
-   Compression& compression) :
-   Connection(transport, tuple, fd, compression, server),
+   Compression& compression, const TlsClientIdentity& tlsClientIdentity) :
+   Connection(transport, tuple, fd, compression, server,
+              server ? Data::Empty : tlsClientIdentity.connectionKey()),
    mServer(server),
    mSecurity(security),
    mSslType(sslType),
@@ -68,6 +88,45 @@ TlsConnection::TlsConnection(Transport* transport, const Tuple& tuple,
 
    mSsl = SSL_new(ctx);
    resip_assert(mSsl);
+
+   if(!mServer && !tlsClientIdentity.empty())
+   {
+      const auto failClientIdentity = [this](const char* message)
+      {
+         SSL_free(mSsl);
+         mSsl = nullptr;
+         throw Security::Exception(message, __FILE__, __LINE__);
+      };
+
+      if(!tlsClientIdentity.complete())
+      {
+         failClientIdentity("Both TLS client certificate and private key filenames are required");
+      }
+
+      SSL_set_default_passwd_cb(mSsl, tlsClientPasswordCallback);
+      SSL_set_default_passwd_cb_userdata(mSsl,
+         tlsClientIdentity.privateKeyPassPhrase.empty()
+            ? nullptr : const_cast<Data*>(&tlsClientIdentity.privateKeyPassPhrase));
+
+      if(SSL_use_certificate_chain_file(mSsl,
+            tlsClientIdentity.certificateChainFilename.c_str()) != 1)
+      {
+         failClientIdentity("Failed to load TLS client certificate chain");
+      }
+      if(SSL_use_PrivateKey_file(mSsl, tlsClientIdentity.privateKeyFilename.c_str(),
+                                 SSL_FILETYPE_PEM) != 1)
+      {
+         failClientIdentity("Failed to load TLS client private key");
+      }
+      if(SSL_check_private_key(mSsl) != 1)
+      {
+         failClientIdentity("TLS client certificate and private key do not match");
+      }
+
+      // Loading is complete; do not retain a pointer into SendData metadata.
+      SSL_set_default_passwd_cb_userdata(mSsl, nullptr);
+      SSL_set_default_passwd_cb(mSsl, nullptr);
+   }
 
    resip_assert(mSecurity);
 
@@ -756,6 +815,7 @@ TlsConnection::computePeerName()
    if (mPeerNames.empty())
    {
       ErrLog(<< "Invalid certificate: no subjectAltName/CommonName found");
+      X509_free(cert);
       return;
    }
 

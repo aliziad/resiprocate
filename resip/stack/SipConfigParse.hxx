@@ -28,6 +28,10 @@ public:
    bool getConfigValue(const resip::Data& name, SecurityTypes::SSLType &value);
    SecurityTypes::SSLType getConfigSSLType(const resip::Data& name, SecurityTypes::SSLType defaultValue);
 
+   bool getConfigValue(const resip::Data& name, SecurityTypes::TlsVersion &value);
+   SecurityTypes::TlsVersion getConfigTlsVersion(const resip::Data& name,
+                                                  SecurityTypes::TlsVersion defaultValue = SecurityTypes::TLSv1_2);
+
    bool getConfigValue(const resip::Data& name, SecurityTypes::TlsClientVerificationMode &value);
    SecurityTypes::TlsClientVerificationMode getConfigClientVerificationMode(const resip::Data& name, SecurityTypes::TlsClientVerificationMode defaultValue);
 

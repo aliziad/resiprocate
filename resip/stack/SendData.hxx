@@ -3,6 +3,7 @@
 
 #include "rutil/Data.hxx"
 #include "resip/stack/Tuple.hxx"
+#include "resip/stack/TlsClientIdentity.hxx"
 
 namespace resip
 {
@@ -27,12 +28,14 @@ class SendData
                const Data& pdata,
                const Data& tid,
                const Data& scid,
-               bool isCompressed = false): 
+               bool isCompressed = false,
+               const TlsClientIdentity& tlsClientIdentity = TlsClientIdentity()):
          destination(dest),
          data(pdata),
          transactionId(tid),
          sigcompId(scid),
          isAlreadyCompressed(isCompressed),
+         tlsClientIdentity(tlsClientIdentity),
          command(NoCommand)
       {
       }
@@ -68,6 +71,7 @@ class SendData
       Data transactionId;
       Data sigcompId;
       bool isAlreadyCompressed;
+      TlsClientIdentity tlsClientIdentity;
 
       // .bwc. Used for special commands: ie. to close connections, and enable flow timers
       SendDataCommand command;

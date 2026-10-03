@@ -276,7 +276,14 @@ TcpBaseTransport::bindClientSocket(Socket sock,
 }
 
 Connection*
-TcpBaseTransport::makeOutgoingConnection(const Tuple &dest,
+TcpBaseTransport::createOutgoingConnection(const Tuple& who, Socket fd,
+      const TlsClientIdentity&)
+{
+   return createConnection(who, fd, false);
+}
+
+Connection*
+TcpBaseTransport::makeOutgoingConnection(const Tuple &dest, const TlsClientIdentity& tlsClientIdentity,
       TransportFailure::FailureReason &failReason, int &failSubCode)
 {
    // attempt to open
@@ -360,7 +367,7 @@ TcpBaseTransport::makeOutgoingConnection(const Tuple &dest,
    }
 
    // This will add the connection to the manager
-   Connection *conn = createConnection(dest, sock, false);
+   Connection *conn = createOutgoingConnection(dest, sock, tlsClientIdentity);
    resip_assert(conn);
    conn->mFirstWriteAfterConnectedPending = true;
 
@@ -376,7 +383,10 @@ TcpBaseTransport::processAllWriteRequests()
       DebugLog (<< "Processing write for " << data->destination);
 
       // this will check by connectionId first, then by address
-      Connection* conn = mConnectionManager.findConnection(data->destination);
+      const TlsClientIdentity& tlsClientIdentity = supportsTlsClientIdentity()
+         ? data->tlsClientIdentity : TlsClientIdentity();
+      const Data tlsClientIdentityKey = tlsClientIdentity.connectionKey();
+      Connection* conn = mConnectionManager.findConnection(data->destination, tlsClientIdentityKey);
 
       //DebugLog (<< "TcpBaseTransport::processAllWriteRequests() using " << conn);
 
@@ -408,7 +418,7 @@ TcpBaseTransport::processAllWriteRequests()
       {
          TransportFailure::FailureReason failCode = TransportFailure::Failure;
          int subCode = 0;
-         if((conn = makeOutgoingConnection(data->destination, failCode, subCode)) == 0)
+         if((conn = makeOutgoingConnection(data->destination, tlsClientIdentity, failCode, subCode)) == 0)
          {
             DebugLog (<< "Failed to create connection: " << data->destination);
             fail(data->transactionId, failCode, subCode);

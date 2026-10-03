@@ -36,10 +36,11 @@ WssTransport::WssTransport(Fifo<TransactionMessage>& fifo,
                            std::shared_ptr<WsCookieContextFactory> cookieContextFactory,
                            const Data& certificateFilename, 
                            const Data& privateKeyFilename,
-                           const Data& privateKeyPassPhrase):
+                           const Data& privateKeyPassPhrase,
+                           SecurityTypes::TlsVersion minimumTlsVersion):
    TlsBaseTransport(fifo, portNum, version, interfaceObj, security, sipDomain, sslType, WSS, socketFunc, 
                     compression, transportFlags, cvm, useEmailAsSIP, certificateFilename, privateKeyFilename,
-                    privateKeyPassPhrase),
+                    privateKeyPassPhrase, minimumTlsVersion),
    WsBaseTransport(connectionValidator, cookieContextFactory)
 {
    InfoLog (<< "Creating WSS transport for domain " 
@@ -57,6 +58,16 @@ WssTransport::createConnection(const Tuple& who, Socket fd, bool server)
                                         tlsDomain(), mSslType, mCompression,
                                         mConnectionValidator);
    return conn;
+}
+
+Connection*
+WssTransport::createOutgoingConnection(const Tuple& who, Socket fd,
+                                       const TlsClientIdentity& tlsClientIdentity)
+{
+   resip_assert_not_null(this);
+   return new WssConnection(this, who, fd, mSecurity, false, tlsDomain(),
+                            mSslType, mCompression, mConnectionValidator,
+                            tlsClientIdentity);
 }
 
 

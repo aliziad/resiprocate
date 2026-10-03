@@ -13,8 +13,9 @@ using namespace resip;
 WssConnection::WssConnection(Transport* transport, const Tuple& who, Socket fd,
                               Security* security, bool server, Data domain,
                               SecurityTypes::SSLType sslType , Compression &compression,
-                              std::shared_ptr<WsConnectionValidator> wsConnectionValidator)
-  : TlsConnection(transport, who, fd, security, server, domain, sslType, compression),
+                              std::shared_ptr<WsConnectionValidator> wsConnectionValidator,
+                              const TlsClientIdentity& tlsClientIdentity)
+  : TlsConnection(transport, who, fd, security, server, domain, sslType, compression, tlsClientIdentity),
     WsConnectionBase(wsConnectionValidator)
 {
    DebugLog (<< "Creating WSS connection " << who << " on " << fd);

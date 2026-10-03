@@ -45,6 +45,9 @@ class TcpBaseTransport : public InternalTransport, public FdPollItemIf
 
       /** Makes new Connection using provided socket. */
       virtual Connection* createConnection(const Tuple& who, Socket fd, bool server=false)=0;
+      virtual Connection* createOutgoingConnection(const Tuple& who, Socket fd,
+                                                   const TlsClientIdentity& tlsClientIdentity);
+      virtual bool supportsTlsClientIdentity() const { return false; }
 
       /** Forms a connection if one doesn't exist, moves requests to the
 	  appropriate connection's fifo.
@@ -61,7 +64,7 @@ class TcpBaseTransport : public InternalTransport, public FdPollItemIf
       /* Helper to make a new outgoing TCP connection.
        * Makes the socket, connects it, etc.
        */
-      Connection* makeOutgoingConnection(const Tuple &dest,
+      Connection* makeOutgoingConnection(const Tuple &dest, const TlsClientIdentity& tlsClientIdentity,
             TransportFailure::FailureReason &failCode, int &subCode);
 
       static const size_t MaxWriteSize;

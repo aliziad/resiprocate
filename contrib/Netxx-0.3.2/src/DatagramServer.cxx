@@ -64,21 +64,21 @@
 
 //####################################################################
 Netxx::DatagramServer::DatagramServer (port_type port, const Timeout &timeout) {
-    std::auto_ptr<ServerBase> ap(pimpl_ = new ServerBase(timeout));
+    std::shared_ptr<ServerBase> ap(pimpl_ = new ServerBase(timeout));
 
     Address addr;
     addr.add_all_addresses(port);
     pimpl_->bind_to(addr, false);
 
-    ap.release();
+    ap.reset();
 }
 //####################################################################
 Netxx::DatagramServer::DatagramServer (const Address &addr, const Timeout &timeout) {
-    std::auto_ptr<ServerBase> ap(pimpl_ = new ServerBase(timeout));
+    std::shared_ptr<ServerBase> ap(pimpl_ = new ServerBase(timeout));
 
     pimpl_->bind_to(addr, false);
 
-    ap.release();
+    ap.reset();
 }
 //####################################################################
 Netxx::DatagramServer::~DatagramServer (void) {

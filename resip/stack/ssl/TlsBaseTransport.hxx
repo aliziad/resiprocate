@@ -39,7 +39,8 @@ class TlsBaseTransport : public TcpBaseTransport
                    bool useEmailAsSIP = false,
                    const Data& certificateFilename = "", 
                    const Data& privateKeyFilename = "",
-                   const Data& privateKeyPassPhrase = "");
+                   const Data& privateKeyPassPhrase = "",
+                   SecurityTypes::TlsVersion minimumTlsVersion = SecurityTypes::TLSv1_2);
       virtual  ~TlsBaseTransport();
 
       void onReload();
@@ -78,9 +79,13 @@ class TlsBaseTransport : public TcpBaseTransport
 
    protected:
       Connection* createConnection(const Tuple& who, Socket fd, bool server=false);
+      Connection* createOutgoingConnection(const Tuple& who, Socket fd,
+                                           const TlsClientIdentity& tlsClientIdentity) override;
+      bool supportsTlsClientIdentity() const override { return true; }
 
       Security* mSecurity;
       SecurityTypes::SSLType mSslType;
+      SecurityTypes::TlsVersion mMinimumTlsVersion;
       SSL_CTX* mDomainCtx;
       SecurityTypes::TlsClientVerificationMode mClientVerificationMode;
       /* If true, we will accept the email address in a client's subjectAltName

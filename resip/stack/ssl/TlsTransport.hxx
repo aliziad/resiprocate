@@ -38,7 +38,8 @@ class TlsTransport : public TlsBaseTransport
                    bool useEmailAsSIP = false,
                    const Data& certificateFilename = "", 
                    const Data& privateKeyFilename = "",
-                   const Data& privateKeyPassPhrase = "");
+                   const Data& privateKeyPassPhrase = "",
+                   SecurityTypes::TlsVersion minimumTlsVersion = SecurityTypes::TLSv1_2);
       virtual  ~TlsTransport();
 };
 

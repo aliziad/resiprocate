@@ -44,7 +44,8 @@ class WssTransport : public TlsBaseTransport, public WsBaseTransport
                    std::shared_ptr<WsCookieContextFactory> = std::make_shared<BasicWsCookieContextFactory>(),
                    const Data& certificateFilename = "", 
                    const Data& privateKeyFilename = "",
-                   const Data& privateKeyPassPhrase = "");
+                   const Data& privateKeyPassPhrase = "",
+                   SecurityTypes::TlsVersion minimumTlsVersion = SecurityTypes::TLSv1_2);
 
       // !bw! why is this re-defined here when the public definition in the TlsBaseTransport base class is identical?!
       bool isUseEmailAsSIP()
@@ -52,6 +53,8 @@ class WssTransport : public TlsBaseTransport, public WsBaseTransport
 
    protected:
       Connection* createConnection(const Tuple& who, Socket fd, bool server = false) override;
+      Connection* createOutgoingConnection(const Tuple& who, Socket fd,
+                                           const TlsClientIdentity& tlsClientIdentity) override;
 };
 
 }

@@ -1132,6 +1132,10 @@ void DialogUsageManager::outgoingProcess(std::unique_ptr<Message> message)
 void
 DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, std::unique_ptr<SipMessage> msg)
 {
+   // Preserve the DUM user identity as non-wire metadata until an outbound
+   // TLS connection is selected or created.
+   msg->setTlsClientIdentity(userProfile.getTlsClientIdentity());
+
    //a little inefficient, branch parameter might be better
    DialogId id(*msg);
    if (userProfile.hasOutboundProxy() && 

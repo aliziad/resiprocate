@@ -1348,7 +1348,9 @@ TransportSelector::transmit(SipMessage* msg, Tuple& target, SendData* sendData)
          std::unique_ptr<SendData> send(new SendData(target,
                                                      resip::Data::Empty,
                                                      msg->getTransactionId(),
-                                                     remoteSigcompId));
+                                                     remoteSigcompId,
+                                                     false,
+                                                     msg->getTlsClientIdentity()));
 
          send->data.reserve(mAvgBufferSize + mAvgBufferSize/4);
 

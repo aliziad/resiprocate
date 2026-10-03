@@ -96,38 +96,38 @@ struct Netxx::Datagram::pimpl {
 //####################################################################
 Netxx::Datagram::Datagram (const Address &connect_to, const Timeout &timeout) {
     if (!connect_to.size()) throw Exception("no addresses to call connect for");
-    std::auto_ptr<pimpl> ap(pimpl_ = new pimpl(timeout));
+    std::shared_ptr<pimpl> ap(pimpl_ = new pimpl(timeout));
 
     call_connect(pimpl_->socket_, *connect_to.begin(), pimpl_->files_);
     pimpl_->pi_.add_socket(pimpl_->socket_.get_socketfd());
 
-    ap.release();
+    ap.reset();
 }
 //####################################################################
 Netxx::Datagram::Datagram (const char *peer_name, port_type default_port, const Timeout &timeout) {
     Address connect_to(peer_name, default_port);
-    std::auto_ptr<pimpl> ap(pimpl_ = new pimpl(timeout));
+    std::shared_ptr<pimpl> ap(pimpl_ = new pimpl(timeout));
 
     call_connect(pimpl_->socket_, *connect_to.begin(), pimpl_->files_);
     pimpl_->pi_.add_socket(pimpl_->socket_.get_socketfd());
 
-    ap.release();
+    ap.reset();
 }
 //####################################################################
 Netxx::Datagram::Datagram (socket_type socketfd, const Timeout &timeout) {
-    std::auto_ptr<pimpl> ap (pimpl_ = new pimpl(timeout, socketfd));
+    std::shared_ptr<pimpl> ap (pimpl_ = new pimpl(timeout, socketfd));
 
     pimpl_->pi_.add_socket(pimpl_->socket_.get_socketfd());
 
-    ap.release();
+    ap.reset();
 }
 //####################################################################
 Netxx::Datagram::Datagram (const Timeout &timeout) {
-    std::auto_ptr<pimpl> ap (pimpl_ = new pimpl(timeout));
+    std::shared_ptr<pimpl> ap (pimpl_ = new pimpl(timeout));
 
     pimpl_->pi_.add_socket(pimpl_->socket_.get_socketfd());
 
-    ap.release();
+    ap.reset();
 }
 //####################################################################
 Netxx::Datagram::~Datagram (void) {

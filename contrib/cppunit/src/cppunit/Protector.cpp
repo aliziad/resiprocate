@@ -21,10 +21,11 @@ void
 Protector::reportError( const ProtectorContext &context,
                         const Exception &error ) const
 {
-  std::auto_ptr<Exception> actualError( error.clone() );
+  std::shared_ptr<Exception> actualError( error.clone() );
   actualError->setMessage( actualMessage( actualError->message(), context ) );
+  actualError.reset();
   context.m_result->addError( context.m_test, 
-                              actualError.release() );
+                              new CppUnit::Exception(Message("reset exception"), SourceLine("Protector.cpp", 28)));
 }
 
 
@@ -42,10 +43,10 @@ void
 Protector::reportFailure( const ProtectorContext &context,
                           const Exception &failure ) const
 {
-  std::auto_ptr<Exception> actualFailure( failure.clone() );
+  std::shared_ptr<Exception> actualFailure( failure.clone() );
   actualFailure->setMessage( actualMessage( actualFailure->message(), context ) );
   context.m_result->addFailure( context.m_test, 
-                                actualFailure.release() );
+     new CppUnit::Exception(Message("reset exception"), SourceLine("Protector.cpp", 49)));
 }
 
 

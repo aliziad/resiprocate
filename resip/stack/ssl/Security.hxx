@@ -93,7 +93,8 @@ class BaseSecurity
 
       BaseSecurity(const CipherList& cipherSuite = StrongestSuite, 
                    const Data& defaultPrivateKeyPassPhrase = Data::Empty, 
-                   const Data& dHParamsFilename = Data::Empty);
+                   const Data& dHParamsFilename = Data::Empty,
+                   SecurityTypes::TlsVersion minimumTlsVersion = SecurityTypes::TLSv1_2);
       virtual ~BaseSecurity();
 
       // used to initialize the openssl library
@@ -160,7 +161,7 @@ class BaseSecurity
       Data getUserPrivateKeyPEM(const Data& aor) const;
       Data getUserPrivateKeyDER(const Data& aor) const;
 
-      void generateUserCert(const Data& aor, int expireDays=365, int keyLen=1024);
+      void generateUserCert(const Data& aor, int expireDays=365, int keyLen=2048);
 
       // Produces a detached signature
       MultipartSignedContents* sign(const Data& senderAor, Contents* );
@@ -214,16 +215,8 @@ class BaseSecurity
       typedef std::map<Data,Data>      PassPhraseMap;
 
    protected:
-      /**
-       * Note:
-       *
-       * mTlsCtx is being used when TLSv1 is requested.
-       * Adding more non-static fields like mTlsCtx for subsequent
-       * versions (e.g. for OpenSSL TLSv1_1_method()) breaks ABI
-       * compatability and is therefore difficult to backport onto
-       * release branches.  Better to use SSLv23_method and use OpenSSL
-       * options flags to specify the exact protocol versions to support.
-       */
+      // Both retained contexts use TLS_method() and the configured modern
+      // protocol floor. mTlsCtx/mSslCtx names remain for API compatibility.
       SSL_CTX*       mTlsCtx;
       SSL_CTX*       mSslCtx;
       static void dumpAsn(const char*, Data);
@@ -231,6 +224,7 @@ class BaseSecurity
       CipherList mCipherList;
       Data mDefaultPrivateKeyPassPhrase;
       Data mDHParamsFilename;
+      SecurityTypes::TlsVersion mMinimumTlsVersion;
 
       // root cert list
       X509List       mRootCerts;
@@ -269,8 +263,10 @@ class BaseSecurity
 class Security : public BaseSecurity
 {
    public:
-      Security(const Data& pathToCerts, const CipherList& = StrongestSuite, const Data& defaultPrivateKeyPassPhrase = Data::Empty, const Data& dHParamsFilename = Data::Empty);
-      Security(const CipherList& = StrongestSuite, const Data& defaultPrivateKeyPassPhrase = Data::Empty, const Data& dHParamsFilename = Data::Empty);
+      Security(const Data& pathToCerts, const CipherList& = StrongestSuite, const Data& defaultPrivateKeyPassPhrase = Data::Empty, const Data& dHParamsFilename = Data::Empty,
+               SecurityTypes::TlsVersion minimumTlsVersion = SecurityTypes::TLSv1_2);
+      Security(const CipherList& = StrongestSuite, const Data& defaultPrivateKeyPassPhrase = Data::Empty, const Data& dHParamsFilename = Data::Empty,
+               SecurityTypes::TlsVersion minimumTlsVersion = SecurityTypes::TLSv1_2);
 
       void addCADirectory(const Data& caDirectory);
       void addCAFile(const Data& caFile);
@@ -279,7 +275,8 @@ class Security : public BaseSecurity
       void loadCAFile(const Data& fileName);
       virtual void preload();
       virtual SSL_CTX* createDomainCtx(const SSL_METHOD* method, const Data& domain, const Data& certificateFilename, 
-                                       const Data& privateKeyFilename, const Data& privateKeyPassPhrase);
+                                       const Data& privateKeyFilename, const Data& privateKeyPassPhrase,
+                                       SecurityTypes::TlsVersion minimumTlsVersion = SecurityTypes::TLSv1_2);
       virtual void updateDomainCtx(SSL_CTX* ctx, const Data& domain, const Data& certificateFilename, const Data& privateKeyFilename, const Data& privateKeyPassPhrase);
 
       virtual void onReadPEM(const Data& name, PEMType type, Data& buffer) const;

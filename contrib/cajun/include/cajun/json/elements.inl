@@ -255,7 +255,7 @@ inline bool Object::Member::operator == (const Member& member) const
 #if _HAS__CXX17 || __cplusplus >= 201703L
 class Object::Finder
 #else
-class Object::Finder : public std::unary_function<Object::Member, bool>
+class Object::Finder : public std::function<bool(Object::Member)>
 #endif
 {
 public:

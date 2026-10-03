@@ -21,6 +21,7 @@
     <ClCompile Include="WebAdmin.cxx" />
     <ClCompile Include="WebAdminThread.cxx" />
     <ClCompile Include="SqlDb.cxx" />
+    <ClCompile Include="RestAdmin.cxx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="WebAdminThread.hxx" />
@@ -32,6 +33,7 @@
     <ClInclude Include="ReproVersion.hxx" />
     <ClInclude Include="WebAdmin.hxx" />
     <ClInclude Include="SqlDb.hxx" />
+    <ClInclude Include="RestAdmin.hxx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="webadmin\pageOutlinePost.ixx">

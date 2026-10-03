@@ -67,13 +67,13 @@ Netxx::Probe::Probe (void) {
 }
 //####################################################################
 Netxx::Probe::Probe (const Probe &other) {
-    std::auto_ptr<pimpl> ap(pimpl_ = new pimpl);
+    std::shared_ptr<pimpl> ap(pimpl_ = new pimpl);
 
     pimpl_->ready_queue_    = other.pimpl_->ready_queue_;
     pimpl_->pilist_	    = other.pimpl_->pilist_;
     pimpl_->probe_impl_	    = other.pimpl_->probe_impl_;
 
-    ap.release();
+    ap.reset();
 }
 //####################################################################
 Netxx::Probe& Netxx::Probe::operator= (const Probe &other) {

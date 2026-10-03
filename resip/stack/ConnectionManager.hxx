@@ -40,6 +40,7 @@ class ConnectionManager
 
       /// may return 0
       Connection* findConnection(const Tuple& tuple);
+      Connection* findConnection(const Tuple& tuple, const Data& tlsClientIdentityKey);
       const Connection* findConnection(const Tuple& tuple) const;
 
       /// populate the fdset againt the read and write lists
@@ -53,7 +54,7 @@ class ConnectionManager
       void addToWritable(Connection* conn); // add the specified conn to end
       void removeFromWritable(Connection* conn); // remove the current mWriteMark
 
-      typedef std::map<Tuple, Connection*> AddrMap;
+      typedef std::multimap<Tuple, Connection*> AddrMap;
       typedef std::map<Socket, Connection*> IdMap;
 
       void addConnection(Connection* connection);

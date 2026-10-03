@@ -10,6 +10,7 @@
 #include "rutil/Timer.hxx"
 #include "resip/stack/Transport.hxx"
 #include "resip/stack/MsgHeaderScanner.hxx"
+#include "resip/stack/TlsClientIdentity.hxx"
 #include "rutil/IntrusiveListElement.hxx"
 
 namespace resip
@@ -43,7 +44,8 @@ class Connection : public ConnectionBase,
       friend EncodeStream& operator<<(EncodeStream& strm, const resip::Connection& c);
 
    public:
-      Connection(Transport* transport,const Tuple& who, Socket socket, Compression &compression, bool isServer);
+      Connection(Transport* transport,const Tuple& who, Socket socket, Compression &compression, bool isServer,
+                 const Data& tlsClientIdentityKey = Data::Empty);
       virtual ~Connection();
       
       /*!
@@ -104,6 +106,7 @@ class Connection : public ConnectionBase,
       static volatile bool mEnablePostConnectSocketFuncCall;
       static void setEnablePostConnectSocketFuncCall(bool enabled = true) { mEnablePostConnectSocketFuncCall = enabled; }
       bool isServer()const;
+      const Data& getTlsClientIdentityKey() const noexcept { return mTlsClientIdentityKey; }
    protected:
       /// pure virtual, but need concrete Connection for book-ends of lists
       virtual int read(char* /* buffer */, const int /* count */) { return 0; }
@@ -131,6 +134,7 @@ class Connection : public ConnectionBase,
       Connection(const Connection&);
       Connection& operator=(const Connection&);
       bool mIsServer;
+      Data mTlsClientIdentityKey;
 };
 
 EncodeStream& 

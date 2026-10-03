@@ -373,7 +373,8 @@ SipStack::addTransport( TransportType protocol,
                         bool useEmailAsSIP,
                         std::shared_ptr<WsConnectionValidator> wsConnectionValidator,
                         std::shared_ptr<WsCookieContextFactory> wsCookieContextFactory,
-                        const Data& netNs)
+                        const Data& netNs,
+                        SecurityTypes::TlsVersion minimumTlsVersion)
 {
    resip_assert(!mShuttingDown);
 
@@ -439,7 +440,8 @@ SipStack::addTransport( TransportType protocol,
                                          useEmailAsSIP,
                                          certificateFilename, 
                                          privateKeyFilename,
-                                         privateKeyPassPhrase);
+                                         privateKeyPassPhrase,
+                                         minimumTlsVersion);
 #else
             CritLog (<< "Can't add TLS transport: TLS not supported in this stack. You don't have openssl.");
             throw Transport::Exception("Can't add TLS transport: TLS not supported in this stack. You don't have openssl.", __FILE__,__LINE__);
@@ -494,7 +496,8 @@ SipStack::addTransport( TransportType protocol,
                   wsCookieContextFactory,
                   certificateFilename, 
                   privateKeyFilename,
-                  privateKeyPassPhrase);
+                  privateKeyPassPhrase,
+                  minimumTlsVersion);
 #else
             CritLog (<< "Can't add WSS transport: Secure Websockets not supported in this stack. You don't have openssl.");
             throw Transport::Exception("Can't add WSS transport: Secure Websockets not supported in this stack. You don't have openssl.", __FILE__,__LINE__);

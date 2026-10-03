@@ -55,6 +55,12 @@ ConnectionManager::closeConnections()
 Connection*
 ConnectionManager::findConnection(const Tuple& addr)
 {
+   return findConnection(addr, Data::Empty);
+}
+
+Connection*
+ConnectionManager::findConnection(const Tuple& addr, const Data& tlsClientIdentityKey)
+{
    if (addr.mFlowKey != 0)
    {
       IdMap::iterator i = mIdMap.find(addr.mFlowKey);
@@ -63,7 +69,12 @@ ConnectionManager::findConnection(const Tuple& addr)
          if(i->second->who() == addr)
          {
             DebugLog(<<"Found fd " << addr.mFlowKey);
-            return i->second;
+            // An explicit flow key uniquely selects the connection. Messages
+            // such as responses do not necessarily carry the originating
+            // UserProfile metadata, so an empty identity key is acceptable.
+            return tlsClientIdentityKey.empty() ||
+                   i->second->getTlsClientIdentityKey() == tlsClientIdentityKey
+               ? i->second : 0;
          }
          else
          {
@@ -83,11 +94,14 @@ ConnectionManager::findConnection(const Tuple& addr)
       }
    }
    
-   AddrMap::iterator i = mAddrMap.find(addr);
-   if (i != mAddrMap.end())
+   std::pair<AddrMap::iterator, AddrMap::iterator> range = mAddrMap.equal_range(addr);
+   for(AddrMap::iterator i = range.first; i != range.second; ++i)
    {
-      DebugLog(<<"Found connection for tuple "<< addr );
-      return i->second;
+      if(i->second->getTlsClientIdentityKey() == tlsClientIdentityKey)
+      {
+         DebugLog(<<"Found connection for tuple "<< addr );
+         return i->second;
+      }
    }
 
    DebugLog(<<"Could not find a connection for " << addr);
@@ -182,11 +196,9 @@ ConnectionManager::removeFromWritable(Connection* conn)
 void
 ConnectionManager::addConnection(Connection* connection)
 {
-   resip_assert(mAddrMap.find(connection->who())==mAddrMap.end());
-
    DebugLog (<< "ConnectionManager::addConnection() " << connection->mWho.mFlowKey  << ":" << connection->who() << ", totalConnections=" << mIdMap.size());
    
-   mAddrMap[connection->who()] = connection;
+   mAddrMap.insert(std::make_pair(connection->who(), connection));
    mIdMap[connection->who().mFlowKey] = connection;
 
    if ( mPollGrp ) 
@@ -208,7 +220,6 @@ ConnectionManager::addConnection(Connection* connection)
 
    //DebugLog (<< "count=" << mAddrMap.count(connection->who()) << "who=" << connection->who() << " mAddrMap=" << Inserter(mAddrMap));
    //assert(mAddrMap.begin()->first == connection->who());
-   resip_assert(mAddrMap.count(connection->who()) == 1);
 }
 
 void
@@ -217,7 +228,15 @@ ConnectionManager::removeConnection(Connection* connection)
    DebugLog (<< "ConnectionManager::removeConnection()");
 
    mIdMap.erase(connection->mWho.mFlowKey);
-   mAddrMap.erase(connection->mWho);
+   std::pair<AddrMap::iterator, AddrMap::iterator> range = mAddrMap.equal_range(connection->mWho);
+   for(AddrMap::iterator i = range.first; i != range.second; ++i)
+   {
+      if(i->second == connection)
+      {
+         mAddrMap.erase(i);
+         break;
+      }
+   }
 
    if ( mPollGrp ) 
    {

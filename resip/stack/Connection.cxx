@@ -33,13 +33,15 @@ volatile bool Connection::mEnablePostConnectSocketFuncCall = false;
 
 Connection::Connection(Transport* transport,const Tuple& who, Socket socket,
                        Compression &compression,
-                       bool isServer)
+                       bool isServer,
+                       const Data& tlsClientIdentityKey)
    : ConnectionBase(transport,who,compression),
      mFirstWriteAfterConnectedPending(false),
      mInWritable(false),
      mFlowTimerEnabled(false),
      mPollItemHandle(0),
-     mIsServer(isServer)
+     mIsServer(isServer),
+     mTlsClientIdentityKey(tlsClientIdentityKey)
 {
    mWho.mFlowKey=(FlowKey)socket;
    InfoLog (<< "Connection::Connection: new connection created to who: " << mWho << ", is server = " << mIsServer);
@@ -179,7 +181,8 @@ Connection::performWrite()
             Data(Data::Take, new char[(int)dataSize], (Data::size_type)dataSize),
             oldSd->transactionId,
             oldSd->sigcompId,
-            false);
+            false,
+            oldSd->tlsClientIdentity);
       resip_assert(dataWs && dataWs->data.data());
       uBuffer = (uint8_t*)dataWs->data.data();
 
@@ -236,7 +239,8 @@ Connection::performWrite()
                                           sm->getStreamLength()),
                                      oldSd->transactionId,
                                      oldSd->sigcompId,
-                                     true);
+                                     true,
+                                     oldSd->tlsClientIdentity);
       mOutstandingSends.front() = newSd;
       delete oldSd;
       delete sm;

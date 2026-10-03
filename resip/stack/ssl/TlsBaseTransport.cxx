@@ -36,10 +36,12 @@ TlsBaseTransport::TlsBaseTransport(Fifo<TransactionMessage>& fifo,
                            bool useEmailAsSIP,
                            const Data& certificateFilename, 
                            const Data& privateKeyFilename,
-                           const Data& privateKeyPassPhrase) :
+                           const Data& privateKeyPassPhrase,
+                           SecurityTypes::TlsVersion minimumTlsVersion) :
    TcpBaseTransport(fifo, portNum, version, interfaceObj, socketFunc, compression, transportFlags),
    mSecurity(&security),
    mSslType(sslType),
+   mMinimumTlsVersion(minimumTlsVersion),
    mDomainCtx(0),
    mClientVerificationMode(cvm),
    mUseEmailAsSIP(useEmailAsSIP),
@@ -53,28 +55,22 @@ TlsBaseTransport::TlsBaseTransport(Fifo<TransactionMessage>& fifo,
 
    init();
 
-   // If we have specified a sipDomain, then we need to create a new context for this domain,
-   // otherwise we will use the SSL Ctx or TLS Ctx created in the Security class
-   if(!sipDomain.empty())
+   switch(sslType)
    {
-      switch(sslType)
-      {
       case SecurityTypes::SSLv23:
-         DebugLog(<<"Using SecurityTypes::SSLv23");
-         mDomainCtx = mSecurity->createDomainCtx(TLS_method(), sipDomain, certificateFilename, privateKeyFilename, privateKeyPassPhrase);
          break;
       case SecurityTypes::TLSv1:
-         DebugLog(<<"Using SecurityTypes::TLSv1");
-         mDomainCtx = mSecurity->createDomainCtx(TLS_method(), sipDomain, certificateFilename, privateKeyFilename, privateKeyPassPhrase);
-         if (mDomainCtx) {
-            SSL_CTX_set_min_proto_version(mDomainCtx, TLS1_VERSION);
-            SSL_CTX_set_max_proto_version(mDomainCtx, TLS1_VERSION);
-         }
+         WarningLog(<<"SecurityTypes::TLSv1 is deprecated; enforcing the configured modern TLS minimum");
          break;
       default:
          throw invalid_argument("Unrecognised SecurityTypes::SSLType value");
-      }
    }
+
+   // Each transport owns one reusable policy/trust context. Connections copy
+   // this policy with SSL_new() and install any per-user identity afterward.
+   mDomainCtx = mSecurity->createDomainCtx(TLS_method(), sipDomain,
+      certificateFilename, privateKeyFilename, privateKeyPassPhrase,
+      mMinimumTlsVersion);
 }
 
 
@@ -102,15 +98,11 @@ TlsBaseTransport::getCtx()
       DebugLog(<<"Using TlsDomain-transport SSL_CTX");
       ctx = mDomainCtx;
    }
-   else if(mSslType == SecurityTypes::SSLv23)
-   {
-      DebugLog(<<"Using SecurityTypes::SSLv23 (dynamic version negotiation)");
-      ctx = mSecurity->getSslCtx();
-   }
    else
    {
-      DebugLog(<<"Using SecurityTypes::TLSv1 (pinned to TLSv1)");
-      ctx = mSecurity->getTlsCtx();
+      // Retained as a defensive fallback for custom Security subclasses.
+      DebugLog(<<"Using shared modern TLS SSL_CTX");
+      ctx = mSecurity->getSslCtx();
    }
    // FIXME: would be better to do this in a method called asynchronously after onReload
    // as doing it here may slow down the connection.
@@ -160,6 +152,14 @@ TlsBaseTransport::createConnection(const Tuple& who, Socket fd, bool server)
    Connection* conn = new TlsConnection(this,who, fd, mSecurity, server,
                                         tlsDomain(), mSslType, mCompression );
    return conn;
+}
+
+Connection*
+TlsBaseTransport::createOutgoingConnection(const Tuple& who, Socket fd,
+                                           const TlsClientIdentity& tlsClientIdentity)
+{
+   return new TlsConnection(this, who, fd, mSecurity, false, tlsDomain(),
+                            mSslType, mCompression, tlsClientIdentity);
 }
 
 #endif /* USE_SSL */

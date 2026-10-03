@@ -7,6 +7,7 @@
 #include "resip/stack/Headers.hxx"
 #include "resip/stack/MethodTypes.hxx"
 #include "resip/stack/Tuple.hxx"
+#include "resip/stack/TlsClientIdentity.hxx"
 #include "resip/dum/Profile.hxx"
 
 namespace resip
@@ -132,6 +133,18 @@ class UserProfile : public Profile
       void clearClientOutboundFlowTuple() { mClientOutboundFlowTuple = Tuple(); }
       void setClientOutboundFlowTuple(const Tuple& outboundFlowTuple) { mClientOutboundFlowTuple = outboundFlowTuple; }  // Only for advanced users
 
+      virtual void setTlsClientIdentity(const TlsClientIdentity& identity) { mTlsClientIdentity = identity; }
+      virtual void setTlsClientIdentity(const Data& certificateChainFilename,
+                                        const Data& privateKeyFilename,
+                                        const Data& privateKeyPassPhrase = Data::Empty)
+      {
+         mTlsClientIdentity = TlsClientIdentity(certificateChainFilename,
+                                                privateKeyFilename,
+                                                privateKeyPassPhrase);
+      }
+      virtual const TlsClientIdentity& getTlsClientIdentity() const noexcept { return mTlsClientIdentity; }
+      virtual void clearTlsClientIdentity() { mTlsClientIdentity = TlsClientIdentity(); }
+
    protected:
       virtual UserProfile* clone() const;
 
@@ -152,6 +165,7 @@ class UserProfile : public Profile
       friend class ClientRegistration;
       friend class Dialog;
       Tuple mClientOutboundFlowTuple;
+      TlsClientIdentity mTlsClientIdentity;
       
       typedef std::set<DigestCredential> DigestCredentials;
       DigestCredentials mDigestCredentials;

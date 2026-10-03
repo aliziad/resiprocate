@@ -71,21 +71,21 @@ namespace {
 }
 //####################################################################
 Netxx::StreamServer::StreamServer (port_type port, const Timeout &timeout, int listen_backlog) {
-    std::auto_ptr<ServerBase> ap(pimpl_ = new ServerBase(timeout));
+    std::shared_ptr<ServerBase> ap(pimpl_ = new ServerBase(timeout));
 
     Address addr;
     addr.add_all_addresses(port);
     init(addr, listen_backlog);
 
-    ap.release();
+    ap.reset();
 }
 //####################################################################
 Netxx::StreamServer::StreamServer (const Address &addr, const Timeout &timeout, int listen_backlog) {
-    std::auto_ptr<ServerBase> ap(pimpl_ = new ServerBase(timeout));
+    std::shared_ptr<ServerBase> ap(pimpl_ = new ServerBase(timeout));
 
     init(addr, listen_backlog);
 
-    ap.release();
+    ap.reset();
 }
 //####################################################################
 Netxx::StreamServer::~StreamServer (void) {

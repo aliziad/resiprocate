@@ -21,6 +21,7 @@
 #include "resip/stack/Tuple.hxx"
 #include "resip/stack/Uri.hxx"
 #include "resip/stack/MessageDecorator.hxx"
+#include "resip/stack/TlsClientIdentity.hxx"
 #include "resip/stack/Cookie.hxx"
 #include "resip/stack/WsCookieContext.hxx"
 #include "rutil/ResipAssert.h"
@@ -1015,6 +1016,9 @@ class SipMessage : public TransactionMessage
       const Data& getTlsDomain() const { return mTlsDomain; }
       void setTlsDomain(const Data& domain) { mTlsDomain = domain; }
 
+      const TlsClientIdentity& getTlsClientIdentity() const noexcept { return mTlsClientIdentity; }
+      void setTlsClientIdentity(const TlsClientIdentity& identity) { mTlsClientIdentity = identity; }
+
       const std::list<Data>& getTlsPeerNames() const { return mTlsPeerNames; }
       void setTlsPeerNames(const std::list<Data>& tlsPeerNames) { mTlsPeerNames = tlsPeerNames; }
 
@@ -1170,6 +1174,9 @@ class SipMessage : public TransactionMessage
 
       // domain associated with this message for tls cert
       Data mTlsDomain;
+
+      // Local client identity metadata. This is never encoded into the SIP message.
+      TlsClientIdentity mTlsClientIdentity;
 
       // peers domain associate with this message (MTLS)
       std::list<Data> mTlsPeerNames;

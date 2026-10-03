@@ -226,6 +226,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>Ws2_32.lib;Iphlpapi.lib;Dnsapi.lib;crypt32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -268,6 +269,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>Ws2_32.lib;Iphlpapi.lib;Dnsapi.lib;crypt32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>

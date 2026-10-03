@@ -37,7 +37,8 @@ class TlsConnection : public Connection
       TlsConnection( Transport* transport, const Tuple& who, Socket fd, 
                      Security* security, bool server, Data domain, 
                      SecurityTypes::SSLType sslType ,
-                     Compression &compression);
+                     Compression &compression,
+                     const TlsClientIdentity& tlsClientIdentity = TlsClientIdentity());
       
       virtual ~TlsConnection();
 

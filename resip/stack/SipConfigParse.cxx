@@ -127,6 +127,7 @@ SipConfigParse::getConfigValue(const resip::Data& name, SecurityTypes::SSLType &
 #else
       value = SecurityTypes::NoSSL;
 #endif
+      return true;
    }
    return false;
 }
@@ -135,6 +136,40 @@ SecurityTypes::SSLType
 SipConfigParse::getConfigSSLType(const resip::Data& name, SecurityTypes::SSLType defaultValue)
 {
    SecurityTypes::SSLType ret = defaultValue;
+   getConfigValue(name, ret);
+   return ret;
+}
+
+bool
+SipConfigParse::getConfigValue(const resip::Data& name, SecurityTypes::TlsVersion &value)
+{
+   Data lowerName(name); lowerName.lowercase();
+   ConfigValuesMap::iterator it = mConfigValues.find(lowerName);
+   if(it == mConfigValues.end())
+   {
+      return false;
+   }
+
+   if(isEqualNoCase(it->second, "TLSv1.2") || isEqualNoCase(it->second, "TLS1.2"))
+   {
+      value = SecurityTypes::TLSv1_2;
+   }
+   else if(isEqualNoCase(it->second, "TLSv1.3") || isEqualNoCase(it->second, "TLS1.3"))
+   {
+      value = SecurityTypes::TLSv1_3;
+   }
+   else
+   {
+      Data exceptionString("Unknown minimum TLS version in " + name + " setting: " + it->second);
+      throw Exception(exceptionString, __FILE__, __LINE__);
+   }
+   return true;
+}
+
+SecurityTypes::TlsVersion
+SipConfigParse::getConfigTlsVersion(const resip::Data& name, SecurityTypes::TlsVersion defaultValue)
+{
+   SecurityTypes::TlsVersion ret = defaultValue;
    getConfigValue(name, ret);
    return ret;
 }
