@@ -33,6 +33,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GeoIP", "contrib\GeoIP\GeoIP_17_0.vcxproj", "{6527D843-EE53-4F1E-B0A9-12ABBA8E75CC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "repro", "repro", "{1293EE21-39D4-4D31-B6D3-78D7865E0F85}"
+	ProjectSection(SolutionItems) = preProject
+		repro\repro.config = repro\repro.config
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "queuetostream", "repro\accountingconsumers\queuetostream_17_0.vcxproj", "{02C11EC5-9AB9-44F1-9B60-B719C1728356}"
 EndProject
