@@ -192,6 +192,10 @@ class TransactionState : public DnsHandler
       TransactionUser* mTransactionUser;
       TransportFailure::FailureReason mFailureReason;      
       int mFailureSubCode;
+      
+      Data mFailureString;
+      std::list<Data> mAdditionalFailureStrings;
+
       bool mTcpConnectTimerStarted;
 
       static uint32_t StatelessIdCounter;

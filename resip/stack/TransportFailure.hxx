@@ -32,7 +32,9 @@ class TransportFailure : public TransactionMessage
          CertValidationFailure
       };
 
-      TransportFailure(const Data& transactionId, FailureReason f, int subCode=0);
+      TransportFailure(const Data& transactionId, FailureReason f, int subCode=0, 
+         const Data& failureString = Data::Empty,
+         const std::list<Data>& additionalFailureStrings = {});
 
       virtual const Data& getTransactionId() const;
       virtual bool isClientTransaction() const;
@@ -42,6 +44,10 @@ class TransportFailure : public TransactionMessage
 
       static const char* failureReasonToString(FailureReason failureReason);
 
+      const Data& getFailureString() const noexcept;
+      const std::list<Data>& getAdditionalFailureStrings() const noexcept;
+
+
       virtual EncodeStream& encodeBrief(EncodeStream& str) const;
       virtual EncodeStream& encode(EncodeStream& strm) const;
 
@@ -49,6 +55,9 @@ class TransportFailure : public TransactionMessage
       Data mTransactionId;
       FailureReason mFailureReason;
       int mFailureSubCode;
+
+      Data mFailureString;
+      std::list<Data> mAdditionalFailureStrings;
 };
 
 }

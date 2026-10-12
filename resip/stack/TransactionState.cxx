@@ -2198,6 +2198,23 @@ TransactionState::processNoDnsResults()
 
    WarningCategory warning;
    SipMessage* response = Helper::makeResponse(*mNextTransmission, 503);
+
+   auto addWarning =
+      [response, this](const Data& text)
+      {
+         if (text.empty())
+         {
+            return;
+         }
+
+         WarningCategory detail;
+         detail.hostname() = mController.mHostname;
+         detail.code() = 399;
+         detail.text() = text;
+
+         response->header(h_Warnings).push_back(detail);
+      };
+
    warning.hostname() = mController.mHostname;
    warning.code() = 399;
    warning.text().reserve(100);
@@ -2261,6 +2278,36 @@ TransactionState::processNoDnsResults()
 
    response->header(h_Warnings).push_back(warning);
 
+   if (!mFailureString.empty())
+   {
+      Data primaryFailure;
+      {
+         DataStream stream(primaryFailure);
+
+         stream
+            << TransportFailure::failureReasonToString(
+               mFailureReason)
+            << "; subcode="
+            << mFailureSubCode
+            << "; "
+            << mFailureString;
+      }
+
+      addWarning(primaryFailure);
+   }
+   
+   const bool tlsCertificateFailure =
+      mFailureReason == TransportFailure::CertNameMismatch ||
+      mFailureReason == TransportFailure::CertValidationFailure;
+
+   for (const Data& detail : mAdditionalFailureStrings)
+   {
+      addWarning(
+         tlsCertificateFailure
+         ? Data("OpenSSL: ") + detail
+         : detail);
+   }
+
    sendToTU(response); 
    terminateClientTransaction(mId);
    if (mMachine != Stateless)
@@ -2285,6 +2332,9 @@ TransactionState::processTransportFailure(TransactionMessage* msg)
    {
       mFailureReason = failure->getFailureReason();
       mFailureSubCode = failure->getFailureSubCode();
+      mFailureString = failure->getFailureString();
+      mAdditionalFailureStrings =
+         failure->getAdditionalFailureStrings();
    }
 
    if (mNextTransmission &&  // Note:  If we just transmitted an ACK then mNextTransmission is cleared, so this check is necessary
@@ -2307,6 +2357,8 @@ TransactionState::processTransportFailure(TransactionMessage* msg)
       warning.code() = 399;
       warning.text() = "Failed to deliver CANCEL using the same transport as the INVITE was used";
       response->header(h_Warnings).push_back(warning);
+      response->header(h_StatusLine).reason() =
+         "TLS transport failure";
          
       sendToTU(response);
       return;

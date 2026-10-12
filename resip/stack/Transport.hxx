@@ -252,7 +252,7 @@ class Transport : public FdSetIOObserver
       */
       void fail(const Data& tid,
                 TransportFailure::FailureReason reason = TransportFailure::Failure,
-                int subCode = 0);
+                int subCode = 0, const Data message = "");
 
       /**
          Posts a TcpConnectState to the TransactionMessage Fifo.

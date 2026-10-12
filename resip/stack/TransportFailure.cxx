@@ -2,10 +2,24 @@
 
 using namespace resip;
 
-TransportFailure::TransportFailure(const Data& transactionId, FailureReason f, int subCode)
+TransportFailure::TransportFailure(const Data& transactionId, FailureReason f, int subCode, 
+   const Data& failureString,
+   const std::list<Data>& additionalFailureStrings)
    : mTransactionId(transactionId),
-     mFailureReason(f), mFailureSubCode(subCode)
+     mFailureReason(f), mFailureSubCode(subCode),
+     mFailureString(failureString),
+     mAdditionalFailureStrings(additionalFailureStrings)
 {
+}
+
+const Data& TransportFailure::getFailureString() const noexcept
+{
+   return mFailureString;
+}
+
+const std::list<Data>& TransportFailure::getAdditionalFailureStrings() const noexcept
+{
+   return mAdditionalFailureStrings;
 }
 
 const Data&

@@ -11,6 +11,10 @@
 #include "rutil/NetNs.hxx"
 #include "resip/stack/TcpBaseTransport.hxx"
 
+#ifdef USE_SSL
+   #include "resip/stack/ssl/Security.hxx"
+#endif
+
 #define RESIPROCATE_SUBSYSTEM Subsystem::TRANSPORT
 
 using namespace std;
@@ -418,14 +422,34 @@ TcpBaseTransport::processAllWriteRequests()
       {
          TransportFailure::FailureReason failCode = TransportFailure::Failure;
          int subCode = 0;
-         if((conn = makeOutgoingConnection(data->destination, tlsClientIdentity, failCode, subCode)) == 0)
+
+#ifdef USE_SSL
+         try
          {
-            DebugLog (<< "Failed to create connection: " << data->destination);
-            fail(data->transactionId, failCode, subCode);
-            delete data;
-            // NOTE: We fail this one but don't give up on others in queue
-            return;
+#endif
+            if ((conn = makeOutgoingConnection(data->destination, tlsClientIdentity, failCode, subCode)) == 0)
+            {
+               DebugLog(<< "Failed to create connection: " << data->destination);
+               fail(data->transactionId, failCode, subCode);
+               delete data;
+               // NOTE: We fail this one but don't give up on others in queue
+               return;
+            }
+#ifdef USE_SSL
          }
+         catch (const BaseException& exception)
+         {
+            fail(
+               data->transactionId,
+               TransportFailure::ConnectionException,
+               0,
+               exception.getMessage());
+
+            delete data;
+            continue;
+         }
+#endif
+
          resip_assert(conn->getSocket() != INVALID_SOCKET);
          data->destination.mFlowKey = (FlowKey)conn->getSocket();  // Note: https://stackoverflow.com/questions/1953639/is-it-safe-to-cast-socket-to-int-under-win64
       }

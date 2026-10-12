@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <sstream>
 
 #include <openssl/opensslv.h>
 #if !defined(LIBRESSL_VERSION_NUMBER)
@@ -93,8 +94,14 @@ TlsConnection::TlsConnection(Transport* transport, const Tuple& tuple,
    {
       const auto failClientIdentity = [this](const char* message)
       {
+         // Connection's base class is already fully constructed and has
+         // registered this flow.  Preserve the failure before throwing so
+         // constructor unwinding emits a useful ConnectionTerminated event
+         // instead of the default None/0/empty event.
+         setFailureReason(TransportFailure::ConnectionException, 0, message);
          SSL_free(mSsl);
          mSsl = nullptr;
+         ErrLog(<< message);
          throw Security::Exception(message, __FILE__, __LINE__);
       };
 
@@ -116,8 +123,20 @@ TlsConnection::TlsConnection(Transport* transport, const Tuple& tuple,
       if(SSL_use_PrivateKey_file(mSsl, tlsClientIdentity.privateKeyFilename.c_str(),
                                  SSL_FILETYPE_PEM) != 1)
       {
-         failClientIdentity("Failed to load TLS client private key");
+         std::stringstream ss("Failed to load TLS client private key\n");
+         unsigned long err = 0;
+
+         while ((err = ERR_get_error()) != 0)
+         {
+            char buf[256];
+            ERR_error_string_n(err, buf, sizeof(buf));
+            ss << "OpenSSL: " << buf << '\n';
+         }
+
+         failClientIdentity(ss.str().c_str());
+         
       }
+
       if(SSL_check_private_key(mSsl) != 1)
       {
          failClientIdentity("TLS client certificate and private key do not match");
