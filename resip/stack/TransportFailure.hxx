@@ -5,6 +5,8 @@
 #include "resip/stack/TransactionMessage.hxx"
 #include "rutil/Data.hxx"
 #include "rutil/HeapInstanceCounter.hxx"
+#include <list>
+
 
 namespace resip
 {
