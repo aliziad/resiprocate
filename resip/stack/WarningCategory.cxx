@@ -134,7 +134,36 @@ WarningCategory::encodeParsed(EncodeStream& str) const
 {
    str << mCode << Symbols::SPACE[0];
    str << mHostname << Symbols::SPACE[0];
-   str << Symbols::DOUBLE_QUOTE[0] << mText << Symbols::DOUBLE_QUOTE[0];
+   str << Symbols::DOUBLE_QUOTE[0];
+
+   // mText can be populated from diagnostic sources, including OpenSSL's
+   // multi-line error queue.  Never allow control characters to escape the
+   // quoted-string and create a malformed or injected SIP header.  Quotes and
+   // backslashes are emitted as quoted-pairs, as required for quoted-string.
+   bool pendingSpace = false;
+   for (Data::size_type i = 0; i < mText.size(); ++i)
+   {
+      const unsigned char c = static_cast<unsigned char>(mText[i]);
+      if (c < 0x20 || c == 0x7f)
+      {
+         pendingSpace = true;
+         continue;
+      }
+
+      if (pendingSpace)
+      {
+         str << Symbols::SPACE[0];
+         pendingSpace = false;
+      }
+
+      if (c == Symbols::DOUBLE_QUOTE[0] || c == '\\')
+      {
+         str << '\\';
+      }
+      str << static_cast<char>(c);
+   }
+
+   str << Symbols::DOUBLE_QUOTE[0];
 
    return str;
 }

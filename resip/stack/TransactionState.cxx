@@ -2207,10 +2207,38 @@ TransactionState::processNoDnsResults()
             return;
          }
 
+         // Warning text is encoded as a SIP quoted-string.  Diagnostic text
+         // can contain CR/LF (the OpenSSL error queue commonly does), quotes,
+         // backslashes, and other control characters.  WarningCategory emits
+         // its text verbatim, so allowing those bytes through can create a
+         // malformed SIP message or inject a new header line.
+         Data safeText;
+         safeText.reserve(text.size());
+         bool lastWasSpace = false;
+         for (Data::size_type i = 0; i < text.size(); ++i)
+         {
+            const unsigned char c = static_cast<unsigned char>(text[i]);
+            if (c < 0x20 || c == 0x7f)
+            {
+               if (!lastWasSpace)
+               {
+                  safeText += ' ';
+                  lastWasSpace = true;
+               }
+            }
+            else
+            {
+               // Avoid changing WarningCategory's parser/encoder semantics:
+               // use harmless printable substitutes instead of quoted-pairs.
+               safeText += c == '"' ? '\'' : c == '\\' ? '/' : static_cast<char>(c);
+               lastWasSpace = c == ' ';
+            }
+         }
+
          WarningCategory detail;
          detail.hostname() = mController.mHostname;
          detail.code() = 399;
-         detail.text() = text;
+         detail.text() = safeText;
 
          response->header(h_Warnings).push_back(detail);
       };
