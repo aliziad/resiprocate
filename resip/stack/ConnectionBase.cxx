@@ -102,7 +102,9 @@ ConnectionBase::~ConnectionBase()
       {
          mTransport->fail(sendData->transactionId,
             mFailureReason ? mFailureReason : TransportFailure::ConnectionUnknown,
-            mFailureSubCode);
+            mFailureSubCode,
+            mFailureString,
+            mAdditionalFailureStrings);
       }
       delete sendData;
       mOutstandingSends.pop_front();

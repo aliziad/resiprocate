@@ -349,11 +349,14 @@ Transport::keepAlivePong(const Tuple& flow)
 }
 
 void
-Transport::fail(const Data& tid, TransportFailure::FailureReason reason, int subCode, const Data message)
+Transport::fail(const Data& tid, TransportFailure::FailureReason reason, int subCode,
+                const Data& message,
+                const std::list<Data>& additionalFailureStrings)
 {
    if (!tid.empty())
    {
-      mStateMachineFifo.add(new TransportFailure(tid, reason, subCode, message));
+      mStateMachineFifo.add(new TransportFailure(tid, reason, subCode, message,
+                                                 additionalFailureStrings));
    }
 }
 
